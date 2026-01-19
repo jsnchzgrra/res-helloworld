@@ -132,25 +132,23 @@ pipeline {
         }
 
         
-stage('Results') {
+	stage('Results') {
             steps {
                 // 1. Esto ya te funciona, lo dejamos igual
                 junit 'result-*.xml'
                 
-                // 2. CORRECCIÓN DE CALIDAD: Usamos el formato correcto para los plugins que tienes
+               
                 recordIssues(tools: [
                     flake8(pattern: 'flake8_report.txt'), 
                     bandit(pattern: 'bandit_report.txt')
                 ])
                 
-                // 3. COBERTURA: Usamos el nombre del símbolo que aparece en tu log
+               
                 publishCoverage(adapters: [istanbulCoberturaAdapter(path: 'coverage.xml')])
 
-                // 4. RENDIMIENTO: Usamos el comando correcto
+               
                 perfReport sourceDataFiles: 'results.jtl'
             }
-}
-}
-}
-}        
+	}
+   }
 }
