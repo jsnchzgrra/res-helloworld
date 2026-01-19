@@ -1,6 +1,0 @@
-flask
-pytest
-pytest-cov
-requests
-flake8
-bandit

@@ -73,11 +73,7 @@ pipeline {
 
                                 flask run &
 
-                                
-
-                                WIREMOCK_JAR=$(find . -name "wiremock-jre8-standalone-*.jar" | head -n 1)
-
-                                java -jar $WIREMOCK_JAR --port 9090 --root-dir test/wiremock &
+                           	java -jar /home/juanma/wiremock-jre8-standalone-2.35.0.jar --port 9090 --root-dir test/wiremock &
 
                                 sleep 10
 
