@@ -1,185 +1,100 @@
 pipeline {
 
     agent {
-	label 'python-worker'
+        label 'python-worker'
     }
-
 
     stages {
 
         stage('Get Code') {
-
             steps {
-
+                sh 'whoami && hostname && pwd'
                 checkout scm
-
                 sh 'ls -R' 
-
             }
-
         }
-
-    
 
         stage('Build') {
-
-           steps {
-
-              echo 'Eyyy, esto es Python. No hay que compilar nada!!!'
-
-              sh 'pip install -r requirements.txt'
-
-           }
-
+            steps {
+                echo 'Eyyy, esto es Python. No hay que compilar nada!!!'
+                sh 'pip install -r requirements.txt'
+            }
         }
-
-        
 
         stage('Tests') {
-
             parallel {
-
                 stage('Unit') {
-
                     steps {
-
+                        sh 'whoami && hostname && pwd'
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-
                             sh '''
-
                                 export PYTHONPATH=.
-
                                 pytest --junitxml=result-unit.xml --cov=app --cov-report=xml:coverage.xml test/unit
-
                             '''
-
                         }
-
                     }
-
                 }
-
-                
 
                 stage('Rest') {
-
                     steps {
-
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-
                             sh '''
-
                                 export FLASK_APP=app/api.py
-
                                 export PYTHONPATH=.
-
                                 flask run &
-
-                           	java -jar /home/juanma/wiremock-jre8-standalone-2.35.0.jar --port 9090 --root-dir test/wiremock &
-
+                                java -jar /home/juanma/wiremock-jre8-standalone-2.35.0.jar --port 9090 --root-dir test/wiremock &
                                 sleep 10
-
                                 pytest --junitxml=result-rest.xml test/rest
-
-                                # Matamos los procesos de fondo al terminar
-
                                 kill $(jobs -p) || true
-
                             '''
-
                         }
-
                     }
-
                 }
-
 
                 stage('Static Analysis') {
-
                     steps {
-
                         sh 'flake8 app --format=pylint > flake8_report.txt || true'
-
                         sh 'bandit -r app -f txt -o bandit_report.txt || true'
-
                     }
-
                 }
-
 
                 stage('Performance') {
-
                     steps {
-
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-
                             sh '''
-
-                                # Buscamos el archivo jmx
-
                                 JMX_FILE=$(find . -name "*.jmx" | head -n 1)
-
                                 /home/juanma/apache-jmeter-5.6.3/bin/jmeter -n -t $JMX_FILE -l results.jtl
-
                             '''
-
                         }
-
                     }
-
                 }
-
             }
-
         }
 
-        
-stage('Results') {
-
+        stage('Results') {
             steps {
-
-                
-
                 junit 'result-*.xml'
-
                 
-
-                
-
                 recordIssues(tools: [
-
                     flake8(pattern: 'flake8_report.txt'),
-
                     pyLint(pattern: 'bandit_report.txt') 
-
                 ])
-
                 
-
-                
-
                 publishCoverage(adapters: [
-
                     istanbulCoberturaAdapter(path: 'coverage.xml')
-
                 ])
-
                 
-
-                
-
                 perfReport sourceDataFiles: 'results.jtl'
-
                 
-
-                
-
                 archiveArtifacts artifacts: '*.txt, *.jtl, *.xml', allowEmptyArchive: true
-
             }
-
         }
 
-   }
-
+        stage('Promote') {
+            steps {
+                sh 'tar -czvf app-dist-${BUILD_NUMBER}.tar.gz app/ requirements.txt'
+                archiveArtifacts artifacts: 'app-dist-*.tar.gz', fingerprint: true
+            }
+        }
+    }
 }
