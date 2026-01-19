@@ -132,23 +132,48 @@ pipeline {
         }
 
         
-	stage('Results') {
-            steps {
-                // 1. Esto ya te funciona, lo dejamos igual
-                junit 'result-*.xml'
-                
-               
-                recordIssues(tools: [
-                    flake8(pattern: 'flake8_report.txt'), 
-                    bandit(pattern: 'bandit_report.txt')
-                ])
-                
-               
-                publishCoverage(adapters: [istanbulCoberturaAdapter(path: 'coverage.xml')])
+stage('Results') {
 
-               
+            steps {
+
+                
+
+                junit 'result-*.xml'
+
+                
+
+                
+
+                recordIssues(tools: [
+
+                    flake8(pattern: 'flake8_report.txt'),
+
+                    pyLint(pattern: 'bandit_report.txt') 
+
+                ])
+
+                
+
+                
+
+                publishCoverage(adapters: [
+
+                    istanbulCoberturaAdapter(path: 'coverage.xml')
+
+                ])
+
+                
+
+                
+
                 perfReport sourceDataFiles: 'results.jtl'
+
+                
+
+                
+
+                archiveArtifacts artifacts: '*.txt, *.jtl, *.xml', allowEmptyArchive: true
+
             }
-	}
-   }
-}
+
+        }
