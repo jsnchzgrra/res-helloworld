@@ -132,29 +132,25 @@ pipeline {
         }
 
         
-
-        stage('Results') {
+stage('Results') {
             steps {
-                // 1. Los tests normales
+                // 1. Esto ya te funciona, lo dejamos igual
                 junit 'result-*.xml'
                 
-                // 2. El análisis estático (Flake8 y Bandit)
-                // Esto hará que aparezca el menú "Warnings Next Generation" a la izquierda
-                recordIssues(tools: [flake8(pattern: 'flake8_report.txt'), bandit(pattern: 'bandit_report.txt')])
-
-                // 3. El reporte de rendimiento (JMeter)
-                // Esto generará las gráficas de tiempos de respuesta
-                perfReport sourceDataFiles: 'results.jtl'
+                // 2. CORRECCIÓN DE CALIDAD: Usamos el formato correcto para los plugins que tienes
+                recordIssues(tools: [
+                    flake8(pattern: 'flake8_report.txt'), 
+                    bandit(pattern: 'bandit_report.txt')
+                ])
                 
-                // 4. Cobertura con el "parche" para que no rompa por el error de Java
-                script {
-                    try {
-                        cobertura coberturaReportFile: 'coverage.xml'
-                    } catch (Exception e) {
-                        echo "Reporte de Cobertura procesado (ignoro error visual de plugin)"
-                    }
-                }
+                // 3. COBERTURA: Usamos el nombre del símbolo que aparece en tu log
+                publishCoverage(adapters: [istanbulCoberturaAdapter(path: 'coverage.xml')])
+
+                // 4. RENDIMIENTO: Usamos el comando correcto
+                perfReport sourceDataFiles: 'results.jtl'
             }
-        }
-    }
+}
+}
+}
+}        
 }
