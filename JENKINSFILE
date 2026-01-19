@@ -1,79 +1,162 @@
 pipeline {
+
     agent any
 
+
     stages {
+
         stage('Get Code') {
+
             steps {
-                
-                git 'https://github.com/jsnchzgrra/res-helloworld.git'
-                sh 'ls' 
-                echo "${env.WORKSPACE}"
+
+                checkout scm
+
+                sh 'ls -R' 
+
             }
+
         }
+
     
+
         stage('Build') {
+
            steps {
+
               echo 'Eyyy, esto es Python. No hay que compilar nada!!!'
-              
+
               sh 'pip install -r requirements.txt'
-              sh 'pip install pytest pytest-cov flake8 bandit'
+
            }
+
         }
+
         
+
         stage('Tests') {
+
             parallel {
+
                 stage('Unit') {
+
                     steps {
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+
                             sh '''
+
                                 export PYTHONPATH=.
+
                                 pytest --junitxml=result-unit.xml --cov=app --cov-report=xml:coverage.xml test/unit
+
                             '''
+
                         }
+
                     }
-                }
-                
-                stage('Rest') {
-                    steps {
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                            sh '''
-                                export FLASK_APP=app/api.py
-                                flask run & 
-                                java -jar test/wiremock/wiremock-jre8-standalone-2.28.0.jar --port 9090 --root-dir test/wiremock &
-                                
-                                ping -c 10 127.0.0.1
-                                
-                                pytest --junitxml=result-rest.xml test/rest
-                            '''
-                        }
-                    }
+
                 }
 
                 
-               
-                stage('Static Analysis') {
+
+                stage('Rest') {
+
                     steps {
-                        sh 'flake8 app --format=pylint > flake8_report.txt || true'
-                        sh 'bandit -r app -f txt -o bandit_report.txt || true'
+
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+
+                            sh '''
+
+                                export FLASK_APP=app/api.py
+
+                                export PYTHONPATH=.
+
+                                flask run &
+
+                                
+
+                                WIREMOCK_JAR=$(find . -name "wiremock-jre8-standalone-*.jar" | head -n 1)
+
+                                java -jar $WIREMOCK_JAR --port 9090 --root-dir test/wiremock &
+
+                                sleep 10
+
+                                pytest --junitxml=result-rest.xml test/rest
+
+                                # Matamos los procesos de fondo al terminar
+
+                                kill $(jobs -p) || true
+
+                            '''
+
+                        }
+
                     }
-                } 
+
+                }
+
+
+                stage('Static Analysis') {
+
+                    steps {
+
+                        sh 'flake8 app --format=pylint > flake8_report.txt || true'
+
+                        sh 'bandit -r app -f txt -o bandit_report.txt || true'
+
+                    }
+
+                }
+
 
                 stage('Performance') {
+
                     steps {
-                        sh '/home/juanma/apache-jmeter-5.6.3/bin/jmeter -n -t test/performance/test_plan.jmx -l results.jtl'
+
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+
+                            sh '''
+
+                                # Buscamos el archivo jmx
+
+                                JMX_FILE=$(find . -name "*.jmx" | head -n 1)
+
+                                /home/juanma/apache-jmeter-5.6.3/bin/jmeter -n -t $JMX_FILE -l results.jtl
+
+                            '''
+
+                        }
+
                     }
+
                 }
+
             }
+
         }
+
         
+
         stage ('Results') {
+
             steps {
+
                 
+
                 junit 'result*.xml'
+
                 step([$class: 'CoberturaPublisher', coberturaReportFile: 'coverage.xml'])
+
+                // Estos fallarán si no tienes los plugins instalados, si fallan, comenta las líneas
+
                 recordIssues(tools: [flake8(pattern: 'flake8_report.txt'), bandit(pattern: 'bandit_report.txt')])
+
                 perfReport sourceDataFiles: 'results.jtl'
+
             }
+
         }        
+
      }
+
 }
